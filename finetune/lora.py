@@ -21,8 +21,8 @@ from scripts.prepare_alpaca import generate_prompt
 
 SEED=1337
 eval_interval = 100
-save_interval = 100
-eval_iters = 100
+save_interval = 10
+eval_iters = 10
 log_interval = 1
 devices = 1
 # change this value to force a maximum sequence length
@@ -31,7 +31,7 @@ override_max_seq_length = None
 # Hyperparameters
 learning_rate = 3e-4
 batch_size = 128 # 128
-micro_batch_size = 4 # 4
+micro_batch_size = 1 # 4
 gradient_accumulation_iters = batch_size // micro_batch_size
 assert gradient_accumulation_iters > 0
 max_iters = 50000  # train dataset size
@@ -81,11 +81,11 @@ def setup(
     from pytorch_lightning.loggers import WandbLogger
     # import wandb
     # wandb.init(project="daily_dialog",
-    #     name="daily_dialog-1",
+    #     name=out_dir.name,
     #     group="daily_dialog")
     wandb_logger = WandbLogger(name=out_dir.name, project="lora", log_model=False, save_dir=out_dir.parent)
     #----logging----
-    fabric = L.Fabric(devices=fabric_devices, strategy=strategy, precision=precision, loggers=wandb_logger)
+    fabric = L.Fabric(devices=fabric_devices, strategy=strategy, precision=precision, loggers=[logger, wandb_logger])
     fabric.launch(main, data_dir, checkpoint_dir, out_dir)
 
 
@@ -162,7 +162,7 @@ def train(
     tokenizer = Tokenizer(checkpoint_dir)
     max_seq_length, longest_seq_length, longest_seq_ix = get_max_seq_length(train_data)
 
-    validate(fabric, model, val_data, tokenizer, longest_seq_length)  # sanity check
+    # validate(fabric, model, val_data, tokenizer, longest_seq_length)  # sanity check
 
     with torch.device("meta"):
         meta_model = GPT(model.config)
@@ -225,6 +225,7 @@ def train(
                 f"iter {iter_num} step {step_count}: loss {loss.item():.4f}, iter time:"
                 f" {(t1 - iter_t0) * 1000:.2f}ms{' (optimizer.step)' if not is_accumulating else ''}"
             )
+            fabric.log_dict({"iter": iter_num, "step_count": step_count, "train_loss": loss.item()})
 
         if not is_accumulating and step_count % eval_interval == 0:
             t0 = time.time()
@@ -232,6 +233,7 @@ def train(
             t1 = time.time() - t0
             speed_monitor.eval_end(t1)
             fabric.print(f"step {iter_num}: val loss {val_loss:.4f}, val time: {t1 * 1000:.2f}ms")
+            fabric.log_dict({"iter": iter_num, "step_count": step_count, "val_loss": val_loss.item()})
             fabric.barrier()
         if not is_accumulating and step_count % save_interval == 0:
             checkpoint_path = out_dir / f"iter-{iter_num:06d}-ckpt.pth"
@@ -268,6 +270,7 @@ def validate(
     model.reset_cache()
 
     model.train()
+    fabric.log_dict({"validating_loss": val_loss.item()})
     return val_loss.item()
 
 
