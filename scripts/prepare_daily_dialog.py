@@ -61,6 +61,10 @@ def prepare(
 
     print(f"train has {len(train_set):,} samples")
     print(f"test has {len(test_set):,} samples")
+    
+    # load daily_dialog dataset
+    from datasets import load_dataset
+    daily_data = load_dataset("daily_dialog")
 
     print("Processing train split ...")
     train_set = [
@@ -95,6 +99,47 @@ def download_if_missing(file_path: Path, file_url: str):
         return
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(requests.get(file_url).text)
+
+
+# def prepare_sample(
+#     example: dict,
+#     tokenizer: Tokenizer,
+#     max_length: int,
+#     mask_inputs: bool = MASK_INPUTS,
+#     ignore_index: int = IGNORE_INDEX,
+# ):
+#     """Processes a single sample.
+
+#     Each sample in the dataset consists of:
+#     - instruction: A string describing the task
+#     - input: A string holding a special input value for the instruction.
+#         This only applies to some samples, and in others this is empty.
+#     - output: The response string
+
+#     This function processes this data to produce a prompt text and a label for
+#     supervised training. The prompt text is formed as a single message including both
+#     the instruction and the input. The label/target is the same message but with the
+#     response attached.
+
+#     Finally, both the prompt and the label get tokenized. If desired, all tokens
+#     in the label that correspond to the original input prompt get masked out (default).
+#     """
+#     full_prompt = generate_prompt(example)
+#     full_prompt_and_response = full_prompt + example["output"]
+#     encoded_full_prompt = tokenizer.encode(full_prompt, max_length=max_length)
+#     encoded_full_prompt_and_response = tokenizer.encode(full_prompt_and_response, eos=True, max_length=max_length)
+
+#     # The labels are the full prompt with response, but with the prompt masked out
+#     labels = encoded_full_prompt_and_response.clone()
+#     if mask_inputs:
+#         labels[: len(encoded_full_prompt)] = ignore_index
+
+#     return {
+#         **example,
+#         "input_ids": encoded_full_prompt_and_response,
+#         "input_ids_no_response": encoded_full_prompt,
+#         "labels": labels,
+#     }
 
 
 def prepare_sample(
@@ -136,6 +181,23 @@ def prepare_sample(
         "input_ids_no_response": encoded_full_prompt,
         "labels": labels,
     }
+
+
+# def generate_prompt(example):
+#     """Generates a standardized message to prompt the model with an instruction, optional input and a
+#     'response' field."""
+
+#     if example["input"]:
+#         return (
+#             "Below is an instruction that describes a task, paired with an input that provides further context. "
+#             "Write a response that appropriately completes the request.\n\n"
+#             f"### Instruction:\n{example['instruction']}\n\n### Input:\n{example['input']}\n\n### Response:"
+#         )
+#     return (
+#         "Below is an instruction that describes a task. "
+#         "Write a response that appropriately completes the request.\n\n"
+#         f"### Instruction:\n{example['instruction']}\n\n### Response:"
+#     )
 
 
 def generate_prompt(example):

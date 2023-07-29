@@ -19,7 +19,7 @@ from lit_gpt.utils import lazy_load, check_valid_checkpoint_dir, step_csv_logger
 from lit_gpt.speed_monitor import SpeedMonitorFabric as SpeedMonitor, measure_flops, estimate_flops
 from scripts.prepare_alpaca import generate_prompt
 
-
+SEED=1337
 eval_interval = 100
 save_interval = 100
 eval_iters = 100
@@ -30,8 +30,8 @@ override_max_seq_length = None
 
 # Hyperparameters
 learning_rate = 3e-4
-batch_size = 128
-micro_batch_size = 4
+batch_size = 128 # 128
+micro_batch_size = 4 # 4
 gradient_accumulation_iters = batch_size // micro_batch_size
 assert gradient_accumulation_iters > 0
 max_iters = 50000  # train dataset size
@@ -87,7 +87,7 @@ def main(fabric: L.Fabric, data_dir: Path, checkpoint_dir: Path, out_dir: Path):
 
     speed_monitor = SpeedMonitor(fabric, window_size=50, time_unit="seconds")
 
-    fabric.seed_everything(1337)  # same seed for every process to init model (FSDP)
+    fabric.seed_everything(SEED)  # same seed for every process to init model (FSDP)
 
     if fabric.global_rank == 0:
         os.makedirs(out_dir, exist_ok=True)
