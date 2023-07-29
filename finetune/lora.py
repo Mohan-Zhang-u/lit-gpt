@@ -77,7 +77,15 @@ def setup(
         strategy = "auto"
 
     logger = step_csv_logger(out_dir.parent, out_dir.name, flush_logs_every_n_steps=log_interval)
-    fabric = L.Fabric(devices=fabric_devices, strategy=strategy, precision=precision, loggers=logger)
+    #----logging----
+    from pytorch_lightning.loggers import WandbLogger
+    # import wandb
+    # wandb.init(project="daily_dialog",
+    #     name="daily_dialog-1",
+    #     group="daily_dialog")
+    wandb_logger = WandbLogger(name=out_dir.name, project="lora", log_model=False, save_dir=out_dir.parent)
+    #----logging----
+    fabric = L.Fabric(devices=fabric_devices, strategy=strategy, precision=precision, loggers=wandb_logger)
     fabric.launch(main, data_dir, checkpoint_dir, out_dir)
 
 
