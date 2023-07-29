@@ -45,27 +45,30 @@ def prepare(
 
     destination_path.mkdir(parents=True, exist_ok=True)
     data_file_path = destination_path / data_file_name
-    print("Loading data file...")
-    download_if_missing(data_file_path, data_file_url)
-    with open(data_file_path, "r", encoding="utf-8") as file:
-        data = json.load(file)
+    # print("Loading data file...")
+    # download_if_missing(data_file_path, data_file_url)
+    # with open(data_file_path, "r", encoding="utf-8") as file:
+    #     data = json.load(file)
 
     print("Loading tokenizer...")
     tokenizer = Tokenizer(checkpoint_dir)
 
-    # Partition the dataset into train and test
-    train_set, test_set = random_split(
-        data, [1.0 - test_split_fraction, test_split_fraction], generator=torch.Generator().manual_seed(seed)
-    )
-    train_set, test_set = list(train_set), list(test_set)
+    # # Partition the dataset into train and test
+    # train_set, test_set = random_split(
+    #     data, [1.0 - test_split_fraction, test_split_fraction], generator=torch.Generator().manual_seed(seed)
+    # )
+    # train_set, test_set = list(train_set), list(test_set)
 
-    print(f"train has {len(train_set):,} samples")
-    print(f"test has {len(test_set):,} samples")
+    # print(f"train has {len(train_set):,} samples")
+    # print(f"test has {len(test_set):,} samples")
     
     # load daily_dialog dataset
     from datasets import load_dataset
-    daily_data = load_dataset("daily_dialog")
-
+    data = load_dataset("daily_dialog")
+    train_set = data['train']
+    val_set = data['validation']
+    test_set = data['test']
+    
     print("Processing train split ...")
     train_set = [
         prepare_sample(
@@ -78,6 +81,19 @@ def prepare(
         for sample in tqdm(train_set)
     ]
     torch.save(train_set, destination_path / "train.pt")
+    
+    print("Processing val split ...")
+    val_set = [
+        prepare_sample(
+            example=sample,
+            tokenizer=tokenizer,
+            max_length=max_seq_length,
+            mask_inputs=mask_inputs,
+            ignore_index=ignore_index,
+        )
+        for sample in tqdm(val_set)
+    ]
+    torch.save(val_set, destination_path / "val.pt")
 
     print("Processing test split ...")
     test_set = [
