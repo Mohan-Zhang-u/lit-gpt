@@ -219,18 +219,45 @@ def prepare_sample(
 def generate_prompt(example):
     """Generates a standardized message to prompt the model with an instruction, optional input and a
     'response' field."""
+    
+    # You can assume the first speaker is the user (A) and the second one is the agent (B).
+    # You can take all the turns until agent's last turn as conversation history and predict the last agent's message using your model.
+    # A: 
+    # B:
+    # A:
+    # predict -> B:
+    
+    prompt = "You are a kind and empathetic interlocutor. You are person B, engaging in a conversation with person A. Your goal is to maintain an enjoyable and meaningful chat. \n\n You are also trying to label the action and the emotion of person A's replies. \n\n There are four types of actions: \"inform\", \"question\", \"directive\", \"commissive\". \n\n There are seven types of emotions: \"no emotion\", \"anger\", \"disgust\", \"fear\", \"happiness\", \"sadness\", \"surprise\". \n\n Here begins the conversation: \n\n"
 
-    if example["input"]:
-        return (
-            "Below is an instruction that describes a task, paired with an input that provides further context. "
-            "Write a response that appropriately completes the request.\n\n"
-            f"### Instruction:\n{example['instruction']}\n\n### Input:\n{example['input']}\n\n### Response:"
-        )
-    return (
-        "Below is an instruction that describes a task. "
-        "Write a response that appropriately completes the request.\n\n"
-        f"### Instruction:\n{example['instruction']}\n\n### Response:"
-    )
+    action = { 1: "inform", 2: "question", 3: "directive", 4: "commissive", }
+    emotion = { 0: "no emotion", 1: "anger", 2: "disgust", 3: "fear", 4: "happiness", 5: "sadness", 6: "surprise"}
+
+    input = ""
+    input += prompt
+    output = ""
+    cov_len = len(example['dialog'])
+    assert cov_len >= 2
+    end_of_input = cov_len - (cov_len % 2) - 1 # to make sure the last turn is person B
+    for i in range(end_of_input):
+        if i % 2 == 0:
+            input += "A: " + f"Action: \"{action[example['act'][i]]}\". Emotion: \"{emotion[example['emotion'][i]]}\". Text: " + example['dialog'][i] + "\n"
+        else:
+            input += "B: " + f"Action: \"{action[example['act'][i]]}\". Emotion: \"{emotion[example['emotion'][i]]}\". Text: " + example['dialog'][i] + "\n"
+    
+    output += "B: " + f"Action: \"{action[example['act'][i]]}\". Emotion: \"{emotion[example['emotion'][i]]}\". Text: " + example['dialog'][end_of_input] + "\n"
+    
+    return input, output
+    # if example["input"]:
+    #     return (
+    #         "Below is an instruction that describes a task, paired with an input that provides further context. "
+    #         "Write a response that appropriately completes the request.\n\n"
+    #         f"### Instruction:\n{example['instruction']}\n\n### Input:\n{example['input']}\n\n### Response:"
+    #     )
+    # return (
+    #     "Below is an instruction that describes a task. "
+    #     "Write a response that appropriately completes the request.\n\n"
+    #     f"### Instruction:\n{example['instruction']}\n\n### Response:"
+    # )
 
 
 if __name__ == "__main__":
