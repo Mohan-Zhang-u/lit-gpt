@@ -19,9 +19,9 @@ from lit_gpt.utils import lazy_load, check_valid_checkpoint_dir, step_csv_logger
 from lit_gpt.speed_monitor import SpeedMonitorFabric as SpeedMonitor, measure_flops, estimate_flops
 from scripts.prepare_alpaca import generate_prompt
 
-
+SEED=1337
 eval_interval = 100
-save_interval = 100
+save_interval = 10
 eval_iters = 100
 log_interval = 1
 devices = 1
@@ -30,8 +30,8 @@ override_max_seq_length = None
 
 # Hyperparameters
 learning_rate = 3e-4
-batch_size = 128
-micro_batch_size = 4
+batch_size = 128 # 128
+micro_batch_size = 1 # 4
 gradient_accumulation_iters = batch_size // micro_batch_size
 assert gradient_accumulation_iters > 0
 max_iters = 50000  # train dataset size
@@ -77,7 +77,15 @@ def setup(
         strategy = "auto"
 
     logger = step_csv_logger(out_dir.parent, out_dir.name, flush_logs_every_n_steps=log_interval)
-    fabric = L.Fabric(devices=fabric_devices, strategy=strategy, precision=precision, loggers=logger)
+    #----logging----
+    from pytorch_lightning.loggers import WandbLogger
+    # import wandb
+    # wandb.init(project="daily_dialog",
+    #     name=out_dir.name,
+    #     group="daily_dialog")
+    wandb_logger = WandbLogger(name=out_dir.name, project="lora", log_model=False, save_dir=out_dir.parent)
+    #----logging----
+    fabric = L.Fabric(devices=fabric_devices, strategy=strategy, precision=precision, loggers=[logger, wandb_logger])
     fabric.launch(main, data_dir, checkpoint_dir, out_dir)
 
 
@@ -87,13 +95,14 @@ def main(fabric: L.Fabric, data_dir: Path, checkpoint_dir: Path, out_dir: Path):
 
     speed_monitor = SpeedMonitor(fabric, window_size=50, time_unit="seconds")
 
-    fabric.seed_everything(1337)  # same seed for every process to init model (FSDP)
+    fabric.seed_everything(SEED)  # same seed for every process to init model (FSDP)
 
     if fabric.global_rank == 0:
         os.makedirs(out_dir, exist_ok=True)
 
     train_data = torch.load(data_dir / "train.pt")
-    val_data = torch.load(data_dir / "test.pt")
+    val_data = torch.load(data_dir / "val.pt")
+    test_data = torch.load(data_dir / "test.pt")
 
     if not any((lora_query, lora_key, lora_value, lora_projection, lora_mlp, lora_head)):
         fabric.print("Warning: all LoRA layers are disabled!")
@@ -153,7 +162,10 @@ def train(
     tokenizer = Tokenizer(checkpoint_dir)
     max_seq_length, longest_seq_length, longest_seq_ix = get_max_seq_length(train_data)
 
-    validate(fabric, model, val_data, tokenizer, longest_seq_length)  # sanity check
+    # val_loss = validate(fabric, model, val_data, tokenizer, longest_seq_length)  # sanity check
+    # fabric.print(f"val_loss: {val_loss:.4f}")
+    # fabric.log_dict({"val_loss": val_loss})
+    # fabric.barrier()
 
     with torch.device("meta"):
         meta_model = GPT(model.config)
@@ -216,6 +228,7 @@ def train(
                 f"iter {iter_num} step {step_count}: loss {loss.item():.4f}, iter time:"
                 f" {(t1 - iter_t0) * 1000:.2f}ms{' (optimizer.step)' if not is_accumulating else ''}"
             )
+            fabric.log_dict({"iter": iter_num, "step_count": step_count, "train_loss": loss.item()})
 
         if not is_accumulating and step_count % eval_interval == 0:
             t0 = time.time()
@@ -223,6 +236,7 @@ def train(
             t1 = time.time() - t0
             speed_monitor.eval_end(t1)
             fabric.print(f"step {iter_num}: val loss {val_loss:.4f}, val time: {t1 * 1000:.2f}ms")
+            fabric.log_dict({"iter": iter_num, "step_count": step_count, "val_loss": val_loss.item()})
             fabric.barrier()
         if not is_accumulating and step_count % save_interval == 0:
             checkpoint_path = out_dir / f"iter-{iter_num:06d}-ckpt.pth"
@@ -259,6 +273,7 @@ def validate(
     model.reset_cache()
 
     model.train()
+    fabric.log_dict({"validating_loss": val_loss.item()})
     return val_loss.item()
 
 
