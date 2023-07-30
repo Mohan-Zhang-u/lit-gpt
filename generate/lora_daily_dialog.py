@@ -116,15 +116,19 @@ def main(
 
     tokenizer = Tokenizer(checkpoint_dir)
     
-    full_text = ""
     if prompt == "":
         dataset_name, index = input.split(':')
         index = int(index)
         from datasets import load_dataset
         dataset = load_dataset("daily_dialog")[dataset_name]
         sample = dataset[index]
-        prompt = generate_prompt(sample)
-    #else, directly use prompt
+        prompt, expected_output = generate_prompt(sample)
+        fabric.print(f"Given the current dataset, the prompt is: \n\n")
+        fabric.print(f"{prompt}\n\n")
+        fabric.print(f"Expected output: \n\n")
+        fabric.print(f"{expected_output}\n\n")
+        fabric.print(f"alternatively, you could directly overwrite the prompt with\npython generate/lora_daily_dialog.py --checkpoint_dir checkpoints/meta-llama/Llama-2-7b-chat-hf --lora_path out/lora/alpaca/iter-006399-ckpt.pth --max_new_tokens 500 --prompt 'your prompt here'")
+    # else, directly use prompt
         
     encoded = tokenizer.encode(prompt, device=model.device)
     prompt_length = encoded.size(0)
@@ -144,7 +148,8 @@ def main(
 
     model.reset_cache()
     output = tokenizer.decode(y)
-    output = output.split("### Response:")[1].strip() #TODO:!!!!!!!!!!!!
+    output = "B: "+output.split("\nB: ")[-1].strip()
+    fabric.print(f"Model output:\n\n")
     fabric.print(output)
 
     tokens_generated = y.size(0) - prompt_length
