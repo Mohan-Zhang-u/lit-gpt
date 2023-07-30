@@ -29,6 +29,7 @@ lora_value = True
 lora_projection = False
 lora_mlp = False
 lora_head = False
+USING_PROMPT = False
 
 
 def main(
@@ -117,6 +118,7 @@ def main(
     tokenizer = Tokenizer(checkpoint_dir)
     
     if prompt == "":
+        USING_PROMPT = False
         dataset_name, index = input.split(':')
         index = int(index)
         from datasets import load_dataset
@@ -128,6 +130,8 @@ def main(
         fabric.print(f"Expected output: \n\n")
         fabric.print(f"{expected_output}\n\n")
         fabric.print(f"alternatively, you could directly overwrite the prompt with\npython generate/lora_daily_dialog.py --checkpoint_dir checkpoints/meta-llama/Llama-2-7b-chat-hf --lora_path out/lora/alpaca/iter-006399-ckpt.pth --max_new_tokens 500 --prompt 'your prompt here'")
+    else:
+        USING_PROMPT = True
     # else, directly use prompt
         
     encoded = tokenizer.encode(prompt, device=model.device)
@@ -148,7 +152,9 @@ def main(
 
     model.reset_cache()
     output = tokenizer.decode(y)
-    output = "B: "+output.split("\nB: ")[-1].strip()
+    if USING_PROMPT is False:
+        output = "B: "+output.split("\nB: ")[-1].strip()
+    # else: output is just output
     fabric.print(f"Model output:\n\n")
     fabric.print(output)
 
