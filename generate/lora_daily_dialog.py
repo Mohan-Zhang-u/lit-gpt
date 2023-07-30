@@ -152,10 +152,11 @@ def main(
 
     model.reset_cache()
     output = tokenizer.decode(y)
-    if USING_PROMPT is False:
-        output = "B: "+output.split("\nB: ")[-1].strip()
+    # if USING_PROMPT is False:
+    #     output = "B: "+output.split("\nB: ")[-1].strip()
     # else: output is just output
-    fabric.print(f"Model output:\n\n")
+    # we could use this to control whether to trim the output or not.
+    fabric.print(f"\n\nModel output:\n\n")
     fabric.print(output)
 
     tokens_generated = y.size(0) - prompt_length
