@@ -22,7 +22,7 @@ from scripts.prepare_alpaca import generate_prompt
 SEED=1337
 eval_interval = 100
 save_interval = 10
-eval_iters = 10
+eval_iters = 100
 log_interval = 1
 devices = 1
 # change this value to force a maximum sequence length
@@ -162,7 +162,10 @@ def train(
     tokenizer = Tokenizer(checkpoint_dir)
     max_seq_length, longest_seq_length, longest_seq_ix = get_max_seq_length(train_data)
 
-    # validate(fabric, model, val_data, tokenizer, longest_seq_length)  # sanity check
+    # val_loss = validate(fabric, model, val_data, tokenizer, longest_seq_length)  # sanity check
+    # fabric.print(f"val_loss: {val_loss:.4f}")
+    # fabric.log_dict({"val_loss": val_loss})
+    # fabric.barrier()
 
     with torch.device("meta"):
         meta_model = GPT(model.config)
