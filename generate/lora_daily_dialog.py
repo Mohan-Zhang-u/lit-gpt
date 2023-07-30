@@ -32,7 +32,7 @@ lora_head = False
 
 
 def main(
-    prompt: str = "What food do lamas eat?",
+    prompt: str = "",
     input: str = "",
     lora_path: Path = Path("out/lora/alpaca/lit_model_lora_finetuned.pth"),
     checkpoint_dir: Path = Path("checkpoints/stabilityai/stablelm-base-alpha-3b"),
@@ -49,8 +49,8 @@ def main(
     See `finetune/lora.py`.
 
     Args:
-        prompt: The prompt/instruction (Alpaca style).
-        input: Optional input (Alpaca style).
+        prompt: The prompt to overwrite any text.
+        input: The index in the val_dataset to use as input. This is of format "validation:1" or "test:2": "[dataset]:[index]".
         lora_path: Path to the checkpoint with trained adapter weights, which are the output of
             `finetune/lora.py`.
         checkpoint_dir: The path to the checkpoint folder with pretrained GPT weights.
@@ -115,8 +115,17 @@ def main(
     model = fabric.setup(model)
 
     tokenizer = Tokenizer(checkpoint_dir)
-    sample = {"instruction": prompt, "input": input}
-    prompt = generate_prompt(sample)
+    
+    full_text = ""
+    if prompt == "":
+        dataset_name, index = input.split(':')
+        index = int(index)
+        from datasets import load_dataset
+        dataset = load_dataset("daily_dialog")[dataset_name]
+        sample = dataset[index]
+        prompt = generate_prompt(sample)
+    #else, directly use prompt
+        
     encoded = tokenizer.encode(prompt, device=model.device)
     prompt_length = encoded.size(0)
     max_returned_tokens = prompt_length + max_new_tokens
